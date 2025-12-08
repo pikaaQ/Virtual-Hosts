@@ -36,8 +36,16 @@ jobs:
     - name: Build Debug APK (GitHub flavor)
       run: ./gradlew assembleGithubDebug
       
+    - name: Setup keystore for release build
+      run: |
+        mkdir -p app/keystore
+        
+        # 从GitHub Secrets获取keystore文件并解码
+        echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > app/keystore/release.keystore
+        echo "Keystore file restored"
+        
     - name: Build Release APK (GitHub flavor)
-      run: ./gradlew assembleGithubRelease
+      run: ./gradlew assembleGithubRelease -PRELEASE_STORE_FILE=app/keystore/release.keystore -PRELEASE_STORE_PASSWORD=${{ secrets.RELEASE_STORE_PASSWORD }} -PRELEASE_KEY_ALIAS=${{ secrets.RELEASE_KEY_ALIAS }} -PRELEASE_KEY_PASSWORD=${{ secrets.RELEASE_KEY_PASSWORD }}
       
     - name: Get version info
       id: version
@@ -65,7 +73,7 @@ jobs:
           
           ## 下载说明
           - `vhosts-github-debug.apk`: 调试版本，包含调试信息，体积较大
-          - `vhosts-github-release.apk`: 发布版本，经过混淆和优化，体积较小
+          - `vhosts-github-release.apk`: 发布版本，经过混淆和优化，体积较小（如果可用）
           
           ## 安装方法
           1. 下载对应的 APK 文件
@@ -75,6 +83,7 @@ jobs:
           ## 注意事项
           - 应用需要 VPN 权限才能正常工作
           - 支持通配符 DNS 记录是此应用的核心特性
+          - 如果发布版本不可用，请使用调试版本
         draft: false
         prerelease: false
         
@@ -88,7 +97,17 @@ jobs:
         asset_name: vhosts-github-debug.apk
         asset_content_type: application/vnd.android.package-archive
         
+    - name: Check if Release APK exists
+      id: check_release
+      run: |
+        if [ -f "app/build/outputs/apk/github/release/app-github-release.apk" ]; then
+          echo "release_exists=true" >> $GITHUB_OUTPUT
+        else
+          echo "release_exists=false" >> $GITHUB_OUTPUT
+        fi
+        
     - name: Upload Release APK
+      if: steps.check_release.outputs.release_exists == 'true'
       uses: actions/upload-release-asset@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
