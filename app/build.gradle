@@ -58,10 +58,11 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             // 如果有签名配置则使用
             if (project.hasProperty('RELEASE_STORE_FILE')) {
-                signingConfig signingConfigs.release
+                signingConfig signingConfigs.githubRelease
             }
         }
         debug {
+            minifyEnabled false
             buildConfigField("boolean", "IS_GooglePlay", "false")
         }
     }

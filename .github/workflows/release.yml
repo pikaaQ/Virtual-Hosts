@@ -100,10 +100,10 @@ jobs:
         
         # 构建release APK
         ./gradlew assembleGithubRelease \
-          -PRELEASE_STORE_FILE=app/keystore/release.keystore \
-          -PRELEASE_STORE_PASSWORD=${{ secrets.RELEASE_STORE_PASSWORD }} \
-          -PRELEASE_KEY_ALIAS=${{ secrets.RELEASE_KEY_ALIAS }} \
-          -PRELEASE_KEY_PASSWORD=${{ secrets.RELEASE_KEY_PASSWORD }} \
+          -Pandroid.injected.signing.store.file=app/keystore/release.keystore \
+          -Pandroid.injected.signing.store.password=${{ secrets.RELEASE_STORE_PASSWORD }} \
+          -Pandroid.injected.signing.key.alias=${{ secrets.RELEASE_KEY_ALIAS }} \
+          -Pandroid.injected.signing.key.password=${{ secrets.RELEASE_KEY_PASSWORD }} \
           --info || echo "Release build failed"
           
     - name: Check build outputs
