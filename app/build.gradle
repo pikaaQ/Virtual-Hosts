@@ -48,7 +48,7 @@ android {
             shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             // 如果有签名配置则使用
-            if (project.hasProperty('RELEASE_STORE_FILE') && file(RELEASE_STORE_FILE).exists()) {
+            if (project.hasProperty('RELEASE_STORE_FILE')) {
                 signingConfig signingConfigs.release
             }
         }

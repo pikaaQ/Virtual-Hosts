@@ -82,12 +82,23 @@ jobs:
         echo "Key alias: ${{ secrets.RELEASE_KEY_ALIAS }}"
         echo "Key password: [REDACTED]"
         
+        # 确保keystore文件存在
+        if [ ! -f "app/keystore/release.keystore" ]; then
+          echo "Error: Keystore file not found!"
+          exit 1
+        fi
+        
+        # 显示Gradle属性
+        echo "Gradle properties:"
+        ./gradlew properties -q | grep -i release || echo "No release properties found"
+        
+        # 构建release APK
         ./gradlew assembleGithubRelease \
           -PRELEASE_STORE_FILE=app/keystore/release.keystore \
           -PRELEASE_STORE_PASSWORD=${{ secrets.RELEASE_STORE_PASSWORD }} \
           -PRELEASE_KEY_ALIAS=${{ secrets.RELEASE_KEY_ALIAS }} \
           -PRELEASE_KEY_PASSWORD=${{ secrets.RELEASE_KEY_PASSWORD }} \
-          || echo "Release build failed"
+          --info || echo "Release build failed"
           
     - name: Check build outputs
       run: |
