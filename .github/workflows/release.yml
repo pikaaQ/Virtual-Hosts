@@ -65,6 +65,9 @@ jobs:
         echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > app/keystore/release.keystore
         echo "Keystore file restored"
         
+        # 验证文件是否创建成功
+        ls -la app/keystore/
+        
         # 验证keystore文件
         if [[ ! -f "app/keystore/release.keystore" ]]; then
           echo "Error: Keystore file was not created"
@@ -73,6 +76,9 @@ jobs:
         
         # 显示keystore信息（不包含敏感数据）
         keytool -list -v -keystore app/keystore/release.keystore -storepass "${{ secrets.RELEASE_STORE_PASSWORD }}" | head -20
+        
+        # 验证文件权限
+        chmod 600 app/keystore/release.keystore
         
     - name: Build Release APK (GitHub flavor)
       run: |
@@ -94,7 +100,7 @@ jobs:
         
         # 构建release APK
         ./gradlew assembleGithubRelease \
-          -PRELEASE_STORE_FILE=app/keystore/release.keystore \
+          -PRELEASE_STORE_FILE=keystore/release.keystore \
           -PRELEASE_STORE_PASSWORD=${{ secrets.RELEASE_STORE_PASSWORD }} \
           -PRELEASE_KEY_ALIAS=${{ secrets.RELEASE_KEY_ALIAS }} \
           -PRELEASE_KEY_PASSWORD=${{ secrets.RELEASE_KEY_PASSWORD }} \
