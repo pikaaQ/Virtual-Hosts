@@ -100,7 +100,7 @@ jobs:
         
         # 构建release APK
         ./gradlew assembleGithubRelease \
-          -PRELEASE_STORE_FILE=keystore/release.keystore \
+          -PRELEASE_STORE_FILE=app/keystore/release.keystore \
           -PRELEASE_STORE_PASSWORD=${{ secrets.RELEASE_STORE_PASSWORD }} \
           -PRELEASE_KEY_ALIAS=${{ secrets.RELEASE_KEY_ALIAS }} \
           -PRELEASE_KEY_PASSWORD=${{ secrets.RELEASE_KEY_PASSWORD }} \

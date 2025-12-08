@@ -66,20 +66,7 @@ android {
         }
     }
     
-    // 为 github flavor 添加特定的签名配置
-    android.applicationVariants.all { variant ->
-        if (variant.buildType.name == 'release' && variant.flavorName == 'github') {
-            variant.outputs.each { output ->
-                def outputFile = output.outputFile
-                if (outputFile != null && outputFile.name.endsWith('.apk')) {
-                    // 确保在 CI 环境中也能正确签名
-                    if (project.hasProperty('RELEASE_STORE_FILE')) {
-                        output.packageApplicationProvider.get().signingConfig = signingConfigs.release
-                    }
-                }
-            }
-        }
-    }
+    
 
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_1_8
