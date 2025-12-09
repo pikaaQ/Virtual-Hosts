@@ -38,6 +38,16 @@ android {
                 keyAlias RELEASE_KEY_ALIAS
                 keyPassword RELEASE_KEY_PASSWORD
             }
+            // 尝试使用Android注入的签名属性（GitHub Actions中设置）
+            else if (project.hasProperty('android.injected.signing.store.file') && 
+                     project.hasProperty('android.injected.signing.store.password') &&
+                     project.hasProperty('android.injected.signing.key.alias') &&
+                     project.hasProperty('android.injected.signing.key.password')) {
+                storeFile file(project.findProperty('android.injected.signing.store.file'))
+                storePassword project.findProperty('android.injected.signing.store.password')
+                keyAlias project.findProperty('android.injected.signing.key.alias')
+                keyPassword project.findProperty('android.injected.signing.key.password')
+            }
         }
     }
     
@@ -50,9 +60,12 @@ android {
             // 如果有签名配置则使用
             if (project.hasProperty('RELEASE_STORE_FILE') && file(RELEASE_STORE_FILE).exists()) {
                 signingConfig signingConfigs.release
+            } else if (project.hasProperty('android.injected.signing.store.file')) {
+                signingConfig signingConfigs.release
             }
         }
         debug {
+            minifyEnabled false
             buildConfigField("boolean", "IS_GooglePlay", "false")
         }
     }
