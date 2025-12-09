@@ -33,6 +33,13 @@ jobs:
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
       
+    - name: Set up Android SDK
+      run: |
+        # 安装必要的Android SDK组件
+        echo "y" | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platforms;android-33" "build-tools;30.0.3"
+        echo "y" | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses
+        echo "SDK components installed."
+        
     - name: Setup keystore for release build
       run: |
         mkdir -p app/keystore
@@ -101,11 +108,11 @@ jobs:
           
     - name: Check build outputs
       run: |
-        echo "=== Release APK ==="
-        find app/build/outputs/apk/github/release -name "*.apk" -type f -ls || echo "No release APK found"
+        echo "=== Release APKs ==="
+        find app/build/outputs/apk/ -name "*.apk" -type f -ls || echo "No release APKs found"
         
-        echo "=== All APKs ==="
-        find app/build/outputs/apk -name "*.apk" -type f -ls || echo "No APKs found"
+        echo "=== All build outputs ==="
+        find app/build/outputs/apk -name "*" -type f -ls || echo "No APK files found"
       
     - name: Get version info
       id: version
@@ -132,7 +139,7 @@ jobs:
           - 版本号: ${{ steps.version.outputs.VERSION_NAME }}
           
           ## 下载说明
-          - `vhosts-github-release.apk`: 发布版本，经过混淆和优化，可直接安装使用
+          - `vhosts-github-release.apk`: GitHub发布版本，经过混淆和优化，可直接安装使用
           
           ## 安装方法
           1. 下载对应的 APK 文件
@@ -145,38 +152,56 @@ jobs:
         draft: false
         prerelease: false
         
-    
-        
-    - name: Check if Release APK exists
-      id: check_release
+    - name: Check if GitHub Release APK exists
+      id: check_github_release
       run: |
-        echo "Checking for release APK..."
-        RELEASE_APK_PATH="app/build/outputs/apk/github/release/app-github-release.apk"
+        echo "Checking for GitHub release APK..."
+        # Gradle使用productFlavors时，APK文件名格式为 app-{flavor}-{buildtype}.apk
+        # 当使用签名配置时，Gradle会生成已签名的APK
+        GITHUB_RELEASE_APK_PATH="app/build/outputs/apk/github/release/app-github-release.apk"
         
-        if [ -f "$RELEASE_APK_PATH" ]; then
-          echo "✅ Release APK found at: $RELEASE_APK_PATH"
-          echo "release_exists=true" >> $GITHUB_OUTPUT
-          echo "release_path=$RELEASE_APK_PATH" >> $GITHUB_OUTPUT
+        if [ -f "$GITHUB_RELEASE_APK_PATH" ]; then
+          echo "✅ GitHub Release APK found at: $GITHUB_RELEASE_APK_PATH"
+          echo "github_release_exists=true" >> $GITHUB_OUTPUT
+          echo "github_release_path=$GITHUB_RELEASE_APK_PATH" >> $GITHUB_OUTPUT
           
           # 显示APK信息
-          ls -lh "$RELEASE_APK_PATH"
+          ls -lh "$GITHUB_RELEASE_APK_PATH"
+          echo "APK size: $(stat -c%s "$GITHUB_RELEASE_APK_PATH") bytes"
         else
-          echo "❌ Release APK not found at: $RELEASE_APK_PATH"
-          echo "release_exists=false" >> $GITHUB_OUTPUT
+          echo "❌ Expected APK not found at: $GITHUB_RELEASE_APK_PATH"
           
-          # 查找可能的APK文件
-          echo "Searching for alternative APK files..."
-          find app/build/outputs/apk -name "*release*.apk" -type f -ls || echo "No release APKs found anywhere"
+          # 查找所有在github/release目录下的APK文件
+          APK_FILES=$(find app/build/outputs/apk/github/release -name "*.apk" -type f)
+          if [ -n "$APK_FILES" ]; then
+            echo "Found APK files in github/release directory:"
+            echo "$APK_FILES" | while read file; do
+              echo "  - $file ($(stat -c%s "$file") bytes)"
+            done
+            
+            # 选择最新生成的APK文件
+            FOUND_APK_PATH=$(find app/build/outputs/apk/github/release -name "*.apk" -type f | head -n 1)
+            if [ -n "$FOUND_APK_PATH" ]; then
+              echo "Using first found APK: $FOUND_APK_PATH"
+              echo "github_release_exists=true" >> $GITHUB_OUTPUT
+              echo "github_release_path=$FOUND_APK_PATH" >> $GITHUB_OUTPUT
+            else
+              echo "github_release_exists=false" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "❌ No APK files found in github/release directory"
+            echo "github_release_exists=false" >> $GITHUB_OUTPUT
+          fi
         fi
         
-    - name: Upload Release APK
-      if: steps.check_release.outputs.release_exists == 'true'
+    - name: Upload GitHub Release APK
+      if: steps.check_github_release.outputs.github_release_exists == 'true'
       uses: actions/upload-release-asset@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ${{ steps.check_release.outputs.release_path }}
+        asset_path: ${{ steps.check_github_release.outputs.github_release_path }}
         asset_name: vhosts-github-release.apk
         asset_content_type: application/vnd.android.package-archive
         
