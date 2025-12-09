@@ -81,7 +81,7 @@ jobs:
     - name: Build Release APK (GitHub flavor)
       run: |
         echo "Building release APK with the following parameters:"
-        echo "Store file: app/keystore/release.keystore"
+        echo "Store file: ${{ github.workspace }}/app/keystore/release.keystore"
         echo "Store password: [REDACTED]"
         echo "Key alias: ${{ secrets.RELEASE_KEY_ALIAS }}"
         echo "Key password: [REDACTED]"
@@ -94,7 +94,7 @@ jobs:
         
         # 构建release APK - 如果失败直接退出
         ./gradlew assembleGithubRelease \
-          -Pandroid.injected.signing.store.file=app/keystore/release.keystore \
+          -Pandroid.injected.signing.store.file=${{ github.workspace }}/app/keystore/release.keystore \
           -Pandroid.injected.signing.store.password=${{ secrets.RELEASE_STORE_PASSWORD }} \
           -Pandroid.injected.signing.key.alias=${{ secrets.RELEASE_KEY_ALIAS }} \
           -Pandroid.injected.signing.key.password=${{ secrets.RELEASE_KEY_PASSWORD }} \
