@@ -26,6 +26,11 @@
     <CheckBoxPreference
             android:defaultValue="false"
             android:title="@string/pref_dns_title" android:key="IS_CUS_DNS"/>
+    <EditTextPreference
+            android:defaultValue=""
+            android:selectAllOnFocus="true"
+            android:singleLine="true"
+            android:title="域名后缀过滤" android:summary="输入域名后缀，多个后缀用逗号分隔，如: .com,.org" android:key="DOMAIN_SUFFIXES"/>
     </PreferenceCategory>
 
 

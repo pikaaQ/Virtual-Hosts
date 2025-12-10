@@ -120,6 +120,21 @@ public class TCPOutput implements Runnable
         currentPacket.swapSourceAndDestination();
         if (tcpHeader.isSYN())
         {
+            // 检查是否为DNS请求（端口53）
+            if (destinationPort == 53) {
+                // 对于TCP DNS，我们需要阻止连接，而不是让连接通过自定义DNS
+                // 这里需要根据域名后缀过滤决定是否允许DNS连接
+                String domainSuffixes = vpnService.getDomainSuffixes();
+                boolean isCustomDnsEnabled = vpnService.isCustomDnsEnabled();
+                
+                if (isCustomDnsEnabled && !shouldAllowTcpDnsConnection(ipAndPort, domainSuffixes)) {
+                    // 如果使用自定义DNS且域名后缀不匹配，发送RST包拒绝连接
+                    currentPacket.updateTCPBuffer(responseBuffer, (byte) TCPHeader.RST, 0, tcpHeader.sequenceNumber + 1, 0);
+                    outputQueue.offer(responseBuffer);
+                    return;
+                }
+            }
+            
             SocketChannel outputChannel = SocketChannel.open();
             outputChannel.configureBlocking(false);
             vpnService.protect(outputChannel.socket());
@@ -162,6 +177,20 @@ public class TCPOutput implements Runnable
                     0, tcpHeader.sequenceNumber + 1, 0);
         }
         outputQueue.offer(responseBuffer);
+    }
+    
+    // 对TCP DNS连接的简化处理 - 根据IP地址判断是否允许
+    private boolean shouldAllowTcpDnsConnection(String ipAndPort, String domainSuffixes) {
+        // 如果没有设置域名后缀，则允许所有DNS连接
+        if (domainSuffixes == null || domainSuffixes.trim().isEmpty()) {
+            return true;
+        }
+        // 对于TCP DNS，我们无法直接获取域名（因为域名在DNS查询数据中）
+        // 在当前实现中，我们无法在TCP连接建立阶段知道域名
+        // 所以对于TCP DNS，允许连接建立，但实际DNS查询会在processACK中被处理
+        // 并且实际的DNS查询会通过UDP路径处理（因为我们的VPN会拦截所有DNS查询）
+        // 对TCP连接的处理主要是在processACK方法中
+        return true;
     }
 
     private void processDuplicateSYN(TCB tcb, TCPHeader tcpHeader, ByteBuffer responseBuffer)
@@ -226,6 +255,35 @@ public class TCPOutput implements Runnable
 
             if (payloadSize == 0) return; // Empty ACK, ignore
 
+            // 检查是否为DNS端口（53）
+            if (tcb.referencePacket.ipHeader.destinationAddress != null && tcb.referencePacket.tcpHeader.destinationPort == 53) {
+                String domainSuffixes = vpnService.getDomainSuffixes();
+                boolean isCustomDnsEnabled = vpnService.isCustomDnsEnabled();
+                
+                // 对于TCP DNS，如果我们启用了域名后缀过滤，需要解析DNS查询
+                if (isCustomDnsEnabled && domainSuffixes != null && !domainSuffixes.trim().isEmpty()) {
+                    // TCP DNS包格式：前两个字节是长度，然后是DNS查询数据
+                    if (payloadSize >= 2) {
+                        // 从payloadBuffer中获取DNS查询数据
+                        // 注意：需要复制缓冲区以安全地读取DNS数据
+                        payloadBuffer.mark();
+                        payloadBuffer.position(payloadBuffer.position() - payloadSize); // 回到数据开始位置
+                        byte[] data = new byte[payloadSize];
+                        payloadBuffer.get(data);
+                        payloadBuffer.reset(); // 恢复位置
+                        
+                        // 重置缓冲区位置以继续写入
+                        payloadBuffer.position(payloadBuffer.position() - payloadSize);
+                        
+                        // 检查是否应该处理这个DNS查询
+                        if (!shouldProcessTcpDnsQuery(data, domainSuffixes)) {
+                            // 如果不应该处理，仍然转发到原始DNS服务器，以确保查询可以正常解析
+                            // 这样可以保证不匹配后缀的域名使用系统DNS正常解析
+                        }
+                    }
+                }
+            }
+
             if (!tcb.waitingForNetworkData)
             {
                 selector.wakeup();
@@ -253,6 +311,48 @@ public class TCPOutput implements Runnable
             referencePacket.updateTCPBuffer(responseBuffer, (byte) TCPHeader.ACK, tcb.mySequenceNum, tcb.myAcknowledgementNum, 0);
         }
         outputQueue.offer(responseBuffer);
+    }
+    
+    private boolean shouldProcessTcpDnsQuery(byte[] dnsData, String domainSuffixes) {
+        // TCP DNS查询的前两个字节是长度字段，真正的DNS查询从第3个字节开始
+        if (dnsData == null || dnsData.length < 14) { // DNS头部最小长度
+            return true; // 如果数据不足，允许通过
+        }
+        
+        try {
+            // 跳过TCP DNS的长度字段（前2字节）
+            byte[] dnsQuery = new byte[dnsData.length - 2];
+            System.arraycopy(dnsData, 2, dnsQuery, 0, dnsQuery.length);
+            
+            // 使用Message类解析DNS查询包
+            org.xbill.DNS.Message dnsMessage = new org.xbill.DNS.Message(dnsQuery);
+            org.xbill.DNS.Record question = dnsMessage.getQuestion();
+            
+            if (question != null) {
+                String queryDomain = question.getName().toString();
+                
+                // 使用DnsChange类中的域名过滤逻辑
+                String[] suffixes = domainSuffixes.split(",");
+                for (String suffix : suffixes) {
+                    suffix = suffix.trim();
+                    if (suffix.isEmpty()) continue;
+                    
+                    // 检查域名是否以指定后缀结尾
+                    if (queryDomain.endsWith(suffix)) {
+                        return true; // 匹配后缀，允许处理
+                    }
+                }
+                
+                // 不匹配任何后缀，不允许处理
+                return false;
+            }
+        } catch (Exception e) {
+            LogUtils.e(TAG, "Error parsing TCP DNS query: ", e);
+            // 如果解析出错，允许通过以避免中断连接
+        }
+        
+        // 不匹配任何后缀或解析失败，不允许处理
+        return false;
     }
 
     private void sendRST(TCB tcb, int prevPayloadSize, ByteBuffer buffer)

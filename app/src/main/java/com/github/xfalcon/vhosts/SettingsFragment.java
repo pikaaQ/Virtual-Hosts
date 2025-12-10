@@ -54,6 +54,7 @@ public class SettingsFragment extends PreferenceFragmentCompat implements
     public static final String NET_HOST_FILE = "net_hosts";
     public static final String IPV4_DNS = "IPV4_DNS";
     public static final String IS_CUS_DNS = "IS_CUS_DNS";
+    public static final String DOMAIN_SUFFIXES = "DOMAIN_SUFFIXES";
 
     private Handler handler = null;
 

@@ -78,7 +78,8 @@ public class UDPOutput implements Runnable
                 }
                 // hook dns packet
                 if(currentPacket.udpHeader.destinationPort==53){
-                    ByteBuffer packet_buffer= DnsChange.handle_dns_packet(currentPacket);
+                    String domainSuffixes = vpnService.getDomainSuffixes();
+                    ByteBuffer packet_buffer= DnsChange.handle_dns_packet(currentPacket, domainSuffixes);
                     if(packet_buffer!=null){
                         this.outputQueue.offer(packet_buffer);
                         continue;

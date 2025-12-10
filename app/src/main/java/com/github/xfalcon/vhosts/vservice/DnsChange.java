@@ -38,7 +38,7 @@ public class DnsChange {
     static ConcurrentHashMap<String, String> DOMAINS_IP_MAPS6 = null;
 
 
-    public static ByteBuffer handle_dns_packet(Packet packet) {
+    public static ByteBuffer handle_dns_packet(Packet packet, String domainSuffixes) {
         if (DOMAINS_IP_MAPS4 == null) {
             LogUtils.d(TAG, "DOMAINS_IP_MAPS IS　NULL　HOST FILE ERROR");
             return null;
@@ -61,6 +61,12 @@ public class DnsChange {
             Name query_domain = message.getQuestion().getName();
             String query_string = query_domain.toString();
             LogUtils.d(TAG, "query: " + question.getType() + " :" + query_string);
+            
+            // 检查是否需要使用自定义DNS（根据域名后缀过滤）
+            if (!shouldUseCustomDNS(query_string, domainSuffixes)) {
+                return null; // 不使用自定义DNS，让系统正常解析
+            }
+            
             if (!DOMAINS_IP_MAPS.containsKey(query_string)) {
                 query_string = "." + query_string;
                 int j = 0;
@@ -101,6 +107,33 @@ public class DnsChange {
             return null;
         }
 
+    }
+
+    // 检查域名是否符合后缀过滤规则
+    private static boolean shouldUseCustomDNS(String queryDomain, String domainSuffixes) {
+        if (domainSuffixes == null || domainSuffixes.trim().isEmpty()) {
+            // 如果没有设置域名后缀，则对所有域名使用自定义DNS
+            return true;
+        }
+        
+        String[] suffixes = domainSuffixes.split(",");
+        for (String suffix : suffixes) {
+            suffix = suffix.trim();
+            if (suffix.isEmpty()) continue;
+            
+            // 检查域名是否以指定后缀结尾
+            if (queryDomain.endsWith(suffix)) {
+                return true;
+            }
+        }
+        
+        // 如果域名不匹配任何后缀，则不使用自定义DNS
+        return false;
+    }
+    
+    public static ByteBuffer handle_dns_packet(Packet packet) {
+        // 保持原有方法，用于向后兼容
+        return handle_dns_packet(packet, null);
     }
 
     public static int handle_hosts(InputStream inputStream) {

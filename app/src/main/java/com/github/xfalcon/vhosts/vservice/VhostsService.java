@@ -79,6 +79,16 @@ public class VhostsService extends VpnService {
     private NetworkReceiver netStateReceiver;
     private static boolean isOAndBoot = false;
 
+    public String getDomainSuffixes() {
+        SharedPreferences settings = androidx.preference.PreferenceManager.getDefaultSharedPreferences(this);
+        return settings.getString(SettingsFragment.DOMAIN_SUFFIXES, "");
+    }
+    
+    public boolean isCustomDnsEnabled() {
+        SharedPreferences settings = androidx.preference.PreferenceManager.getDefaultSharedPreferences(this);
+        return settings.getBoolean(SettingsFragment.IS_CUS_DNS, false);
+    }
+
 
     @Override
     public void onCreate() {
